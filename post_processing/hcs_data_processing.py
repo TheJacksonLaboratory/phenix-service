@@ -14,25 +14,44 @@ def parse_args() -> argparse.Namespace:
             "Parse related files for use with the Single Cell Biology "
             "Lab Opera Phenix High Content Screening platform"
         ),
-        prog=__file__
+        prog=__file__,
     )
     add_arg = lambda a, **v: parser.add_argument(a, **v)
 
-
     add_arg(
-        "-i", dest="hcs_input_file", type=Path, required=True, help="Path to HCS input form"
+        "-i",
+        dest="hcs_input_file",
+        type=Path,
+        required=True,
+        help="Path to HCS input form",
     )
     add_arg(
-        "-r", dest="randomization_file", type=Path, required=True, help="Path to randomization CSV file"
+        "-r",
+        dest="randomization_file",
+        type=Path,
+        required=True,
+        help="Path to randomization CSV file",
     )
     add_arg(
-        "-s", dest="spectramax_file", type=Path, required=True, help="Path to Spectra Max export file"
+        "-s",
+        dest="spectramax_file",
+        type=Path,
+        required=True,
+        help="Path to Spectra Max export file",
     )
     add_arg(
-        "-o", dest="output_file", type=Path, required=True, help="Path to Spectra Max export file"
+        "-o",
+        dest="output_file",
+        type=Path,
+        required=True,
+        help="Path to Spectra Max export file",
     )
     add_arg(
-        "-p", dest="plot_pdf_file", type=Path, default=None, help="Path to Spectra Max export file"
+        "-p",
+        dest="plot_pdf_file",
+        type=Path,
+        default=None,
+        help="Path to Spectra Max export file",
     )
 
     return parser.parse_args()
@@ -108,12 +127,14 @@ def parse_phenix_metadata(path: Path) -> typing.Tuple[dict, pd.DataFrame]:
 
     return description, plate_map
 
+
 def assert_path_exists(name: str, path: Path) -> None:
     if path is not None and not path.exists():
         logger.error(f"{name.replace('_',' ').capitalize()}: [{path}] does not exist!")
         print(path)
         print(path.exists())
         exit(2)
+
 
 def assert_path_does_not_exist(name: str, path: Path) -> None:
     if path is not None and path.exists():
@@ -122,7 +143,9 @@ def assert_path_does_not_exist(name: str, path: Path) -> None:
 
 
 def parse_description(excel_file: pd.ExcelFile) -> typing.Tuple[dict, pd.DataFrame]:
-    raw_description = excel_file.parse("Description", index_col=0, header=None).fillna("")
+    raw_description = excel_file.parse("Description", index_col=0, header=None).fillna(
+        ""
+    )
 
     description = raw_description.iloc[:18, :1].squeeze()
     new_index = description.index.dropna()
@@ -139,11 +162,11 @@ def parse_description(excel_file: pd.ExcelFile) -> typing.Tuple[dict, pd.DataFra
     return description, dispensing
 
 
-def parse_daughter_plate_specs(excel_file: pd.ExcelFile) -> typing.Union[pd.DataFrame, None]:
+def parse_daughter_plate_specs(
+    excel_file: pd.ExcelFile,
+) -> typing.Union[pd.DataFrame, None]:
     variables = excel_file.parse("Imaged Plates", index_col=0, header=0)
-    variable_names = variables[
-        "Variable Name"
-    ]
+    variable_names = variables["Variable Name"]
     valid_names = ~variable_names.isnull()
     n_variables = np.sum(valid_names)
     if n_variables == 0:
@@ -156,12 +179,12 @@ def parse_daughter_plate_specs(excel_file: pd.ExcelFile) -> typing.Union[pd.Data
     return variables
 
 
-def construct_dilution_plate(dispensing, dilution_constant=10**(1/2)):
-    dilutions = dispensing.iloc[1, :].values[:, None] * ((1 / dilution_constant) ** np.arange(12))
+def construct_dilution_plate(dispensing, dilution_constant=10 ** (1 / 2)):
+    dilutions = dispensing.iloc[1, :].values[:, None] * (
+        (1 / dilution_constant) ** np.arange(12)
+    )
     dilution_plate = pd.DataFrame(
-            dilutions,
-            index=list("ABCDEFGH"),
-            columns=pd.RangeIndex(1, 13)
+        dilutions, index=list("ABCDEFGH"), columns=pd.RangeIndex(1, 13)
     )
     dilution_plate = dilution_plate.stack().to_frame()
     dilution_plate.index = dilution_plate.index.map("{0[0]}{0[1]}".format)
@@ -175,17 +198,22 @@ def parse_randomization_file(randomization_file):
 
     sheets = []
     for name in sheet_names:
-        sheet = pd.read_excel(
-            randomization_file, sheet_name=name, index_col=0
-            ).dropna().iloc[:,0].values
+        sheet = (
+            pd.read_excel(randomization_file, sheet_name=name, index_col=0)
+            .dropna()
+            .iloc[:, 0]
+            .values
+        )
         sheets.append(sheet.reshape(8, -1))
 
     data_384 = np.block([sheets[:2], sheets[2:]])
-    df_384 = pd.DataFrame(
-        data_384,
-        index=list("ABCDEFGHIJKLMNOP"),
-        columns=pd.RangeIndex(1, 25)
-    ).stack().to_frame()
+    df_384 = (
+        pd.DataFrame(
+            data_384, index=list("ABCDEFGHIJKLMNOP"), columns=pd.RangeIndex(1, 25)
+        )
+        .stack()
+        .to_frame()
+    )
     df_384.index = df_384.index.map("{0[0]}{0[1]}".format)
     df_384.columns = ["source_well_96"]
     return df_384
@@ -197,14 +225,19 @@ def parse_spectramax_file(spectramax_file, encoding="utf-16"):
     generated on Windows has carriage returns as line endings.
     Due to this, the parsing is pretty fragile.
     """
-    data = pd.read_table(
-        spectramax_file,
-        encoding="utf-16",
-        engine="python",
-        sep="\t",
-        skiprows=2,
-        skipfooter=2
-    ).iloc[:16, 2:26].stack().values
+    data = (
+        pd.read_table(
+            spectramax_file,
+            encoding="utf-16",
+            engine="python",
+            sep="\t",
+            skiprows=2,
+            skipfooter=2,
+        )
+        .iloc[:16, 2:26]
+        .stack()
+        .values
+    )
     return data
 
 
@@ -219,8 +252,12 @@ def construct_dataframe(dilution, randomization_file, spectramax_file):
 
     final["spectramax"] = parse_spectramax_file(spectramax_file)
 
-    final[["source_row_96", "source_col_96"]] = final.source_well_96.str.extract("([A-Z])(\d+)")
-    final[["row_384", "col_384"]] = final.index.to_series().str.extract("([A-Z])(\d+)", expand=True)
+    final[["source_row_96", "source_col_96"]] = final.source_well_96.str.extract(
+        "([A-Z])(\d+)"
+    )
+    final[["row_384", "col_384"]] = final.index.to_series().str.extract(
+        "([A-Z])(\d+)", expand=True
+    )
 
     for col in final.columns:
         final[col] = pd.to_numeric(final[col], errors="ignore")
@@ -238,7 +275,7 @@ def construct_dataframe(dilution, randomization_file, spectramax_file):
 
 def construct_daughter_dataframe(final, daughter_info):
     n_plates = daughter_info.shape[1]
-    expanded = pd.concat([final]*n_plates, axis=0)
+    expanded = pd.concat([final] * n_plates, axis=0)
     repeat = lambda x: np.repeat(x, final.shape[0])
     expanded["plate"] = repeat(np.arange(n_plates, dtype=int) + 1)
     for key, row in daughter_info.iterrows():
@@ -261,24 +298,24 @@ def main(args: argparse.Namespace) -> None:
 
     daughter_plate_info = parse_daughter_plate_specs(input_excel)
 
-    dilution_plate = construct_dilution_plate(dispensing, description["Serial dilution constant"])
+    dilution_plate = construct_dilution_plate(
+        dispensing, description["Serial dilution constant"]
+    )
 
     dataframe = construct_dataframe(
-            dilution_plate,
-            args.randomization_file,
-            args.spectramax_file,
+        dilution_plate, args.randomization_file, args.spectramax_file,
     )
 
-    daughter_dataframe = construct_daughter_dataframe(
-        dataframe,
-        daughter_plate_info
-    )
+    daughter_dataframe = construct_daughter_dataframe(dataframe, daughter_plate_info)
 
     if args.plot_pdf_file is not None:
         plot_plates()
 
     dataframe.to_csv(args.output_file)
-    daughter_outfile = args.output_file.parent / f"{args.output_file.stem}-expanded{args.output_file.suffix}"
+    daughter_outfile = (
+        args.output_file.parent
+        / f"{args.output_file.stem}-expanded{args.output_file.suffix}"
+    )
     daughter_dataframe.to_csv(daughter_outfile)
 
 
