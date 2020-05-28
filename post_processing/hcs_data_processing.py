@@ -151,6 +151,7 @@ def parse_daughter_plate_specs(excel_file: pd.ExcelFile) -> typing.Union[pd.Data
         variables = None
     else:
         variables = variables.loc[valid_names]
+        variables.set_index(variables.columns[0], drop=True, inplace=True)
 
     return variables
 
@@ -235,6 +236,16 @@ def construct_dataframe(dilution, randomization_file, spectramax_file):
     return final
 
 
+def construct_daughter_dataframe(final, daughter_info):
+    n_plates = daughter_info.shape[1]
+    expanded = pd.concat([final]*n_plates, axis=0)
+    repeat = lambda x: np.repeat(x, final.shape[0])
+    expanded["plate"] = repeat(np.arange(n_plates, dtype=int) + 1)
+    for key, row in daughter_info.iterrows():
+        expanded[key] = repeat(row.values)
+    return expanded
+
+
 def main(args: argparse.Namespace) -> None:
     vargs = vars(args)
     for name in ("output_file", "plot_pdf_file"):
@@ -252,13 +263,23 @@ def main(args: argparse.Namespace) -> None:
 
     dilution_plate = construct_dilution_plate(dispensing, description["Serial dilution constant"])
 
-    dataframe = construct_dataframe(dilution_plate, args.randomization_file,
-            args.spectramax_file)
+    dataframe = construct_dataframe(
+            dilution_plate,
+            args.randomization_file,
+            args.spectramax_file,
+    )
+
+    daughter_dataframe = construct_daughter_dataframe(
+        dataframe,
+        daughter_plate_info
+    )
 
     if args.plot_pdf_file is not None:
         plot_plates()
 
     dataframe.to_csv(args.output_file)
+    daughter_outfile = args.output_file.parent / f"{args.output_file.stem}-expanded{args.output_file.suffix}"
+    daughter_dataframe.to_csv(daughter_outfile)
 
 
 if __name__ == "__main__":
