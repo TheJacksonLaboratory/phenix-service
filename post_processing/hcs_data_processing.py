@@ -153,10 +153,12 @@ def parse_description(excel_file: pd.ExcelFile) -> typing.Tuple[dict, pd.DataFra
 
     dispensing = raw_description.iloc[19:22]
     dispensing = dispensing.rename(columns=dispensing.iloc[0]).drop(dispensing.index[0])
-    dilution_constant = raw_description.iloc[22, 0]
-    notes = raw_description.iloc[23, 0]
+    dilution_points = raw_description.iloc[22, 0]
+    dilution_constant = raw_description.iloc[23, 0]
+    notes = raw_description.iloc[24, 0]
 
     description["Serial dilution constant"] = dilution_constant
+    description["Serial dilutions"] = dilution_points
     description["Notes"] = notes
 
     return description, dispensing
@@ -179,17 +181,18 @@ def parse_daughter_plate_specs(
     return variables
 
 
-def construct_dilution_plate(dispensing, dilution_constant=10 ** (1 / 2)):
+def construct_dilution_plate(dispensing, n_dilutions, dilution_constant=10 ** (1 / 2)):
     dilutions = dispensing.iloc[1, :].values[:, None] * (
-        (1 / dilution_constant) ** np.arange(12)
+        (1 / dilution_constant) ** np.arange(n_dilutions)
     )
     dilution_plate = pd.DataFrame(
-        dilutions, index=list("ABCDEFGH"), columns=pd.RangeIndex(1, 13)
+        0, index=list("ABCDEFGH"), columns=pd.RangeIndex(1, 13)
     )
+    dilutions_plate.iloc[:, :n_dilutions] = dilutions
     dilution_plate = dilution_plate.stack().to_frame()
     dilution_plate.index = dilution_plate.index.map("{0[0]}{0[1]}".format)
     dilution_plate.columns = ["drug_concentration"]
-    dilution_plate["drug"] = np.repeat(dispensing.iloc[0, :].values, 12)
+    dilution_plate["drug"] = np.repeat(dispensing.iloc[0, :].values, n_dilutions)
     return dilution_plate
 
 
@@ -299,7 +302,7 @@ def main(args: argparse.Namespace) -> None:
     daughter_plate_info = parse_daughter_plate_specs(input_excel)
 
     dilution_plate = construct_dilution_plate(
-        dispensing, description["Serial dilution constant"]
+        dispensing, description["Serial dilutions"], description["Serial dilution constant"]
     )
 
     dataframe = construct_dataframe(
