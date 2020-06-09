@@ -188,11 +188,11 @@ def construct_dilution_plate(dispensing, n_dilutions, dilution_constant=10 ** (1
     dilution_plate = pd.DataFrame(
         0, index=list("ABCDEFGH"), columns=pd.RangeIndex(1, 13)
     )
-    dilutions_plate.iloc[:, :n_dilutions] = dilutions
+    dilution_plate.iloc[:, :n_dilutions] = dilutions
     dilution_plate = dilution_plate.stack().to_frame()
     dilution_plate.index = dilution_plate.index.map("{0[0]}{0[1]}".format)
     dilution_plate.columns = ["drug_concentration"]
-    dilution_plate["drug"] = np.repeat(dispensing.iloc[0, :].values, n_dilutions)
+    dilution_plate["drug"] = np.repeat(dispensing.iloc[0, :].values, 12)
     return dilution_plate
 
 
@@ -268,10 +268,13 @@ def construct_dataframe(dilution, randomization_file, spectramax_file):
         final[col] = final[col].astype("category")
 
     final["drug_code"] = final.drug.cat.codes
-    final["source_x"] = final.source_row_96.cat.codes + 1
-    final["source_y"] = 13 - final.source_col_96
-    final["x"] = final.row_384.cat.codes + 1
-    final["y"] = 25 - final.col_384
+    final["source_y"] = final.source_row_96.cat.codes + 1
+    final["source_x"] = 13 - final.source_col_96
+    final["y"] = final.row_384.cat.codes + 1
+    final["x"] = 25 - final.col_384
+
+    final["quad"] = \
+        1 + 2 * ((final["y"] - 7.5)>0).astype(int) + ((final["x"] - 11.5)<0).astype(int)
 
     return final
 
