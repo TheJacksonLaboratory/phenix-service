@@ -268,13 +268,13 @@ def construct_dataframe(dilution, randomization_file, spectramax_file):
         final[col] = final[col].astype("category")
 
     final["drug_code"] = final.drug.cat.codes
-    final["source_y"] = final.source_row_96.cat.codes + 1
-    final["source_x"] = 13 - final.source_col_96
-    final["y"] = final.row_384.cat.codes + 1
-    final["x"] = 25 - final.col_384
+    final["source_y"] = 9 - final.source_row_96.cat.codes
+    final["source_x"] = final.source_col_96
+    final["y"] = 16 - final.row_384.cat.codes
+    final["x"] = final.col_384
 
     final["quad"] = \
-        1 + 2 * ((final["y"] - 7.5)>0).astype(int) + ((final["x"] - 11.5)<0).astype(int)
+        1 + 2 * ((final["y"] - 7.5)<0).astype(int) + ((final["x"] - 11.5)>0).astype(int)
 
     return final
 
