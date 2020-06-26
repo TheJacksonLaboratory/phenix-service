@@ -44,14 +44,14 @@ def parse_args() -> argparse.Namespace:
         dest="output_file",
         type=Path,
         required=True,
-        help="Path to Spectra Max export file",
+        help="Path to save output dataframe",
     )
     add_arg(
         "-p",
         dest="plot_pdf_file",
         type=Path,
         default=None,
-        help="Path to Spectra Max export file",
+        help="Path to save plots [None = default]",
     )
 
     return parser.parse_args()
@@ -280,12 +280,15 @@ def construct_dataframe(dilution, randomization_file, spectramax_file):
 
 
 def construct_daughter_dataframe(final, daughter_info):
-    n_plates = daughter_info.shape[1]
-    expanded = pd.concat([final] * n_plates, axis=0)
-    repeat = lambda x: np.repeat(x, final.shape[0])
-    expanded["plate"] = repeat(np.arange(n_plates, dtype=int) + 1)
-    for key, row in daughter_info.iterrows():
-        expanded[key] = repeat(row.values)
+    if daughter_info is not None:
+        n_plates = daughter_info.shape[1]
+        expanded = pd.concat([final] * n_plates, axis=0)
+        repeat = lambda x: np.repeat(x, final.shape[0])
+        expanded["plate"] = repeat(np.arange(n_plates, dtype=int) + 1)
+        for key, row in daughter_info.iterrows():
+            expanded[key] = repeat(row.values)
+    else:
+        expanded = final.copy()
     return expanded
 
 
