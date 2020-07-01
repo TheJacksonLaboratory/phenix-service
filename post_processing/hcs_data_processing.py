@@ -19,6 +19,7 @@ INDEX_96_F = pd.Index(INDEX_96_C.values.reshape(len(ROWS_96), -1).ravel(order="F
 INDEX_384_C = pd.Index([f"{r}{c}" for r,c in product(ROWS_384, COLS_384)])
 INDEX_384_F = pd.Index(INDEX_384_C.values.reshape(len(ROWS_384), -1).ravel(order="F"))
 
+
 assert len(INDEX_96_C) == len(INDEX_96_F) == 96
 assert len(INDEX_384_C) == len(INDEX_384_F) == 384
 
@@ -78,7 +79,7 @@ class HighContentScreen:
             quads = np.ones(96, dtype=np.uint8) * (quad + 1)
 
         s = pd.DataFrame(data_96, index=index, columns=[name])
-        s["quad"] = quads
+        s["Quadrant"] = quads
 
         return s
 
@@ -175,8 +176,8 @@ class HighContentScreen:
             quads.append(quad)
 
         randomization_data = pd.concat(quads, axis=0)
-        randomization_data[["Source row 96", "Source col 96"]] = self.split_row_col(randomization_data["Source well 96"])
-        randomization_data[["Row 384", "Col 384"]] = self.split_row_col(randomization_data.index)
+        randomization_data["Source row 96"], randomization_data["Source col 96"] = self.split_row_col(randomization_data["Source well 96"]).values.T
+        randomization_data["Row 384"], randomization_data["Col 384"] = self.split_row_col(randomization_data.index).values.T
         self.data.append(randomization_data)
         self.has_randomization = True
         self.randomization_mapping = randomization_data.iloc[:,0].to_dict()
@@ -233,6 +234,7 @@ class HighContentScreen:
 
     def aggregate_data(self):
         merged = pd.concat(self.data, axis=1)
+        merged.index.name = "Well 384"
 
         for col in merged.columns:
             merged[col] = pd.to_numeric(merged[col], errors="ignore")
@@ -244,9 +246,9 @@ class HighContentScreen:
 
     def incorporate_plate_variables(self, merged):
         if self.variables is not None:
-            n_plates = daughter_info.shape[1]
+            n_plates = self.variables.shape[1]
             expanded = pd.concat([merged] * n_plates, axis=0)
-            repeat = lambda x: np.repeat(x, final.shape[0])
+            repeat = lambda x: np.repeat(x, merged.shape[0])
             expanded["plate"] = repeat(np.arange(n_plates, dtype=int) + 1)
             for key, row in self.variables.iterrows():
                 expanded[key] = repeat(row.values)
