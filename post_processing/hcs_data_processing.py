@@ -235,6 +235,7 @@ class HighContentScreen:
     def aggregate_data(self):
         merged = pd.concat(self.data, axis=1)
         merged.index.name = "Well 384"
+        merged = sort_index(merged)
 
         for col in merged.columns:
             merged[col] = pd.to_numeric(merged[col], errors="ignore")
