@@ -1,33 +1,13 @@
 import sys
-import json
 import typing
 import logging
 import argparse
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from itertools import product
 
-from string import ascii_uppercase
+import utils
 
-COLS_96 = range(1, 13)
-ROWS_96 = ascii_uppercase[:8]
-COLS_384 = range(1, 25)
-ROWS_384 = ascii_uppercase[:16]
-INDEX_96_C = pd.Index([f"{r}{c}" for r,c in product(ROWS_96, COLS_96)])
-INDEX_96_F = pd.Index(INDEX_96_C.values.reshape(len(ROWS_96), -1).ravel(order="F"))
-INDEX_384_C = pd.Index([f"{r}{c}" for r,c in product(ROWS_384, COLS_384)])
-INDEX_384_F = pd.Index(INDEX_384_C.values.reshape(len(ROWS_384), -1).ravel(order="F"))
-
-
-assert len(INDEX_96_C) == len(INDEX_96_F) == 96
-assert len(INDEX_384_C) == len(INDEX_384_F) == 384
-
-def well_sort(item):
-    return (item[0], int(item[1:]))
-
-def sort_index(series):
-    return series.reindex(sorted(series.index, key=well_sort))
 
 class HighContentScreen:
 
@@ -40,54 +20,6 @@ class HighContentScreen:
         self.data = []
         logger.debug("HCS object initialized successfully.")
 
-    @staticmethod
-    def flatten_plate_map(data, colwise=False):
-        ravel = "F" if colwise else "C"
-        return data.ravel(order=ravel)
-
-    @staticmethod
-    def construct_96(data_96, name, colwise=False):
-        index = INDEX_96_F if colwise else INDEX_96_C
-        return pd.Series(data_96, name=name, index=index)
-
-    @staticmethod
-    def construct_384(data_384, name, colwise=False):
-        index = INDEX_384_F if colwise else INDEX_384_C
-        return pd.Series(data_384, name=name, index=index)
-
-    @staticmethod
-    def index_by_quad(quad, colwise=False):
-        assert quad < 4
-        ravel = "F" if colwise else "C"
-        source = INDEX_384_C.values.reshape(len(ROWS_384), -1)
-        i, j = quad//2, quad%2
-        print(i, j)
-        return pd.Index(source[i::2, j::2].ravel(order=ravel))
-
-    @staticmethod
-    def convert_96_to_384(data_96, name, quad=None, colwise=False):
-        if quad is not None and len(data_96) > 96:
-            raise ValueError(f"96 well data for quad={quad} has more than 96 values")
-        elif quad is None and len(data_96) == 96:
-            raise ValueError(f"96 well data with no quad specified has only 96 values")
-
-        if quad is None:
-            index = pd.Index(sum([HighContentScreen.index_by_quad(k, colwise).tolist() for k in range(4)], []))
-            quads = np.repeat(range(4), 96)
-        else:
-            index = HighContentScreen.index_by_quad(quad, colwise)
-            quads = np.ones(96, dtype=np.uint8) * (quad + 1)
-
-        s = pd.DataFrame(data_96, index=index, columns=[name])
-        s["Quadrant"] = quads
-
-        return s
-
-    @staticmethod
-    def split_row_col(s):
-        if isinstance(s, list) or isinstance(s, pd.Index):
-            s = pd.Series(s)
-        return s.str.extract("([A-Z])(\d+)", expand=True)
 
     @staticmethod
     def validate_hcs_excel_file(excel_file):
@@ -129,7 +61,7 @@ class HighContentScreen:
         else:
             variables = variables.loc[valid_names]
             variables.set_index(variables.columns[0], drop=True, inplace=True)
-            logger.debug(f"Found the following plate variables defined: {variables}")
+            logger.debug(f"Found the following plate variables defined:\n{variables}")
 
         self.variables = variables
 
@@ -149,16 +81,16 @@ class HighContentScreen:
         )
         dilution_plate = np.zeros((8, 12))
         dilution_plate[:, :self.serial_dilution_series_length] = dilutions
-        dilution_data = self.construct_96(
-            self.flatten_plate_map(dilution_plate, colwise=False),
+        dilution_data = utils.construct_96(
+            utils.flatten_plate_map(dilution_plate, colwise=False),
             "Concentration", colwise=False
         )
         self.dilution_series = dilution_data
         logger.debug("Created dilution series data sucessfully.")
 
     def construct_drug_series(self):
-        self.drug_series = self.construct_96(
-            self.flatten_plate_map(
+        self.drug_series = utils.construct_96(
+            utils.flatten_plate_map(
                 np.repeat(self.dispensing.iloc[0,:].values, 12), colwise=False
             ), "Drug", colwise=False
         )
@@ -170,14 +102,14 @@ class HighContentScreen:
         for k, name in enumerate(sheet_names):
             quad_data = pd.read_excel(self.randomization_file, sheet_name=name,
                     index_col=0).dropna().iloc[:,0].values
-            quad = self.convert_96_to_384(
+            quad = utils.convert_96_to_384(
                 quad_data, name="Source well 96", quad=k, colwise=True
             )
             quads.append(quad)
 
         randomization_data = pd.concat(quads, axis=0)
-        randomization_data["Source row 96"], randomization_data["Source col 96"] = self.split_row_col(randomization_data["Source well 96"]).values.T
-        randomization_data["Row 384"], randomization_data["Col 384"] = self.split_row_col(randomization_data.index).values.T
+        randomization_data["Source row 96"], randomization_data["Source col 96"] = utils.split_row_col(randomization_data["Source well 96"]).values.T
+        randomization_data["Row 384"], randomization_data["Col 384"] = utils.split_row_col(randomization_data.index).values.T
         self.data.append(randomization_data)
         self.has_randomization = True
         self.randomization_mapping = randomization_data.iloc[:,0].to_dict()
@@ -210,9 +142,9 @@ class HighContentScreen:
             .iloc[:16, 2:26]
             .values
         )
-        flat_data = HighContentScreen.flatten_plate_map(data, colwise=False)
+        flat_data = utils.flatten_plate_map(data, colwise=False)
         logger.debug("Spectramax data constructed successfully.")
-        return HighContentScreen.construct_384(flat_data, "spectramax", colwise=False)
+        return utils.construct_384(flat_data, "spectramax", colwise=False)
 
     def load_measurements(self):
         measurements = []
@@ -235,7 +167,7 @@ class HighContentScreen:
     def aggregate_data(self):
         merged = pd.concat(self.data, axis=1)
         merged.index.name = "Well 384"
-        merged = sort_index(merged)
+        merged = utils.sort_index(merged)
 
         for col in merged.columns:
             merged[col] = pd.to_numeric(merged[col], errors="ignore")
