@@ -7,6 +7,7 @@ import pandas as pd
 from pathlib import Path
 
 import utils
+from plate_plotting import plate_qc, plot_randomization, plot_measurements, PdfPages
 
 
 class HighContentScreen:
@@ -148,12 +149,14 @@ class HighContentScreen:
 
     def load_measurements(self):
         measurements = []
+        self.measurements = []
         for m_name, m_file in self.measurement_files.items():
             assert_path_exists(m_name, m_file)
             if m_name not in self._allowed_measurements.keys():
                 logger.warn(f"Measurement {m_name} not configured. Skipping.")
             logger.debug(f"Trying to load {m_name} from file [{m_file}]")
             measurements.append(self._allowed_measurements[m_name](m_file))
+            self.measurements.append(m_name)
         logger.debug("All measurements loaded successfully.")
         self.data.append(pd.concat(measurements, axis=1))
 
@@ -209,8 +212,22 @@ class HighContentScreen:
         self.output.to_csv(output_file)
         logger.debug(f"Output saved to [{output_file}].")
 
-    def plot_plate_maps(self, output_file):
-        raise NotImplementedError("Don't have plotting yet")
+
+    def plot_plate_maps(self, plot_file):
+        logger.debug(f"Attempting to plot plate data...")
+        if not self.overwrite_allowed:
+            assert_path_does_not_exist("Plot file", plot_file)
+        figs = [
+            plate_qc(self.output),
+            plot_randomization(self.output),
+            plot_measurements(self.output, measurement_cols=self.measurements)
+        ]
+        logger.debug(f"Plots generated")
+        pdf = PdfPages(plot_file)
+        for fig in figs:
+            pdf.savefig(fig)
+        pdf.close()
+        logger.debug(f"Plots saved to [{plot_file}].")
 
 
 def parse_args() -> argparse.Namespace:
@@ -315,3 +332,5 @@ if __name__ == "__main__":
     )
     aggregated = hcs.pipeline()
     hcs.save_output(args.output_file)
+    if args.plot_pdf_file:
+        hcs.plot_plate_maps(args.plot_pdf_file)

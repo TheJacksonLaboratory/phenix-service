@@ -38,7 +38,7 @@ def unflatten_plate_map(data, colwise=False):
     index = INDEX_384_C if len(data) == 384 else INDEX_96_C
     dims = (list(ROWS_384), COLS_384) if len(data) == 384 else (list(ROWS_96), COLS_96)
     plate = pd.DataFrame(index=dims[0], columns=dims[1])
-    plate.loc[:,:] = data.reindex(index).values.reshape(plate.shape)
+    plate.loc[:,:] = data.reindex(index).to_numpy().reshape(plate.shape)
     return plate
 
 
