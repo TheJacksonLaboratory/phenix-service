@@ -1,3 +1,4 @@
+import re
 import typing
 import numpy as np
 import pandas as pd
@@ -14,6 +15,9 @@ INDEX_96_C = pd.Index([f"{r}{c}" for r,c in product(ROWS_96, COLS_96)])
 INDEX_96_F = pd.Index(INDEX_96_C.values.reshape(len(ROWS_96), -1).ravel(order="F"))
 INDEX_384_C = pd.Index([f"{r}{c}" for r,c in product(ROWS_384, COLS_384)])
 INDEX_384_F = pd.Index(INDEX_384_C.values.reshape(len(ROWS_384), -1).ravel(order="F"))
+EXCEL_COLS = list(ascii_uppercase) + ["".join(x) for x in product(ascii_uppercase, repeat=2)]
+EXCEL_TO_NUM = dict((letters, num) for num, letters in enumerate(EXCEL_COLS))
+
 
 assert len(INDEX_96_C) == len(INDEX_96_F) == 96
 assert len(INDEX_384_C) == len(INDEX_384_F) == 384
@@ -25,6 +29,27 @@ def well_sort(item):
 
 def sort_index(series):
     return series.reindex(sorted(series.index, key=well_sort))
+
+
+flatten = lambda *n: list(e for a in n
+    for e in (flatten(*a) if isinstance(a, (tuple, list)) else (a,)))
+def parse_column_spec(col_spec):
+    if isinstance(col_spec, int):
+        return col_spec
+    elif all(c.isdigit() for c in col_spec):
+        return int(col_spec)
+    elif col_spec in EXCEL_TO_NUM:
+        return EXCEL_TO_NUM[col_spec] -1
+
+    assert isinstance(col_spec, str)
+    match = re.match("(.*)([:,])(.*)", col_spec)
+    if not match:
+        return col_spec
+    left, sep, right = match.groups()
+    if sep == ":":
+        return slice(parse_column_spec(left), parse_column_spec(right))
+    else:
+        return flatten([parse_column_spec(left), parse_column_spec(right)])
 
 
 def flatten_plate_map(data, colwise=False):
@@ -50,6 +75,7 @@ def construct_96(data_96, name, colwise=False):
 def construct_384(data_384, name, colwise=False):
     index = INDEX_384_F if colwise else INDEX_384_C
     return pd.Series(data_384, name=name, index=index)
+
 
 def index_by_quad(quad, colwise=False):
     assert quad < 4
@@ -102,3 +128,12 @@ def assert_path_does_not_exist(name: str, path: Path) -> None:
     if path is not None and path.exists():
         logger.error(f"{name.replace('_',' ').capitalize()}: [{path}] already exist!")
         exit(2)
+
+
+if __name__ == "__main__":
+    print(parse_column_spec(1))
+    print(parse_column_spec("1:4"))
+    print(parse_column_spec("This Column"))
+    print(parse_column_spec("This Column,That Column,The other Column"))
+    print(parse_column_spec("1,4"))
+    print(parse_column_spec("DC,GH"))

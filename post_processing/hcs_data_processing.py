@@ -13,7 +13,10 @@ from plate_plotting import plate_qc, plot_randomization, plot_measurements, PdfP
 class HighContentScreen:
 
     def __init__(self, input_form_path, overwrite=False):
-        self._allowed_measurements = {"spectramax": self._load_spectramax}
+        self._allowed_measurements = {
+            "spectramax": self._load_spectramax,
+            "phenix": self._load_phenix
+        }
         self.has_randomization = False
         self.input_form_path = input_form_path
         self.overwrite_allowed = overwrite
@@ -130,7 +133,7 @@ class HighContentScreen:
         logger.debug("Dilution and drug data mapped using randomization mapping.")
 
     @staticmethod
-    def _load_spectramax(spectramax_file):
+    def _load_spectramax(spectramax_file, ignored):
         data = (
             pd.read_table(
                 spectramax_file,
@@ -145,18 +148,37 @@ class HighContentScreen:
         )
         flat_data = utils.flatten_plate_map(data, colwise=False)
         logger.debug("Spectramax data constructed successfully.")
-        return utils.construct_384(flat_data, "spectramax", colwise=False)
+        return utils.construct_384(flat_data, "spectramax", colwise=False), None
+
+    @staticmethod
+    def _load_phenix(phenix_file, phenix_columns):
+        data = pd.read_table(phenix_file, index_col=2)
+        cols = utils.parse_column_spec(phenix_columns)
+        logger.debug(f"Will use phenix data columns: [{cols}]")
+        try:
+            data = data.loc[:, cols]
+        except:
+            data = data.iloc[:, cols]
+        logger.debug("Phenix data constructed successfully.")
+        if len(data.shape) == 1:
+            data = data.to_frame()
+        data.columns = "Phenix - " + data.columns
+        return data, data.columns.tolist()
 
     def load_measurements(self):
         measurements = []
         self.measurements = []
-        for m_name, m_file in self.measurement_files.items():
+        for m_name, (m_file, m_cols) in self.measurement_files.items():
             assert_path_exists(m_name, m_file)
             if m_name not in self._allowed_measurements.keys():
                 logger.warn(f"Measurement {m_name} not configured. Skipping.")
             logger.debug(f"Trying to load {m_name} from file [{m_file}]")
-            measurements.append(self._allowed_measurements[m_name](m_file))
-            self.measurements.append(m_name)
+            m_data, new_names = self._allowed_measurements[m_name](m_file, m_cols)
+            measurements.append(m_data)
+            if new_names:
+                self.measurements += new_names
+            else:
+                self.measurements.append(m_name)
         logger.debug("All measurements loaded successfully.")
         self.data.append(pd.concat(measurements, axis=1))
 
@@ -256,9 +278,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-m", "--measurement",
         dest="measurements",
-        nargs=2, action="append",
+        nargs="+", action="append",
         required=False,
-        help="Path to Spectra Max export file",
+        help=(
+            "Measurement specification: measurement_name measurement_file "
+            "[columns_to_use]. If [columns_to_use] is not given, will use "
+            " all columns presented."
+        )
     )
     parser.add_argument(
         "-o",
@@ -285,7 +311,10 @@ def parse_args() -> argparse.Namespace:
 
     args = parser.parse_args()
     if args.measurements:
-        args.measurements = dict((item[0], Path(item[1])) for item in args.measurements)
+        args.measurements = dict(
+            (item[0], [Path(item[1]), None if len(item)==2 else item[2]])
+            for item in args.measurements
+        )
 
     return args
 
