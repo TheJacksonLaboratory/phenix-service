@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.tri as tri
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm, Normalize
+from matplotlib.colors import LogNorm, Normalize, ListedColormap
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 import cmocean
@@ -13,6 +13,9 @@ from datetime import datetime
 import utils
 
 plt.rcParams["xtick.major.pad"] = 0
+
+
+
 
 
 def add_timestamp(fig):
@@ -126,13 +129,13 @@ def plot_plate_data(ax, data, cmap_or_palette, vmin=1e-6, cbar_ax=None, log=Fals
     hm = sns.heatmap(
         ax=ax,
         data=plate_data,
-        vmin=vmin,
+        vmin=vmin if cbar_ax is not None else None,
         xticklabels=plate_data.columns,
         yticklabels=plate_data.index,
         cmap=cmap_or_palette,
         cbar=cbar_ax is not None,
         cbar_ax=cbar_ax,
-        norm=LogNorm() if log else Normalize(),
+        norm=LogNorm() if log else None,#Normalize(),
         linewidths=0.5, linecolor="k"
     )
     ax.set_xlabel("")
@@ -240,7 +243,6 @@ def plate_qc(data):
     return fig
 
 
-
 def plot_randomization(data):
     data = data.loc[~data.index.duplicated(), :]
 
@@ -296,10 +298,10 @@ def plot_measurements(data, ncols=4, measurement_cols=None):
 
 
 if __name__ == "__main__":
-    data_path = Path("testfile.csv")
+    data_path = Path("test_data/results.csv")
     prefix = data_path.stem
 
-    data = pd.read_csv("testfile.csv", index_col=0)
+    data = pd.read_csv(data_path, index_col=0)
     outfile = f"{prefix}_qc-plots.pdf"
     pdf = PdfPages(outfile)
     figs = [
