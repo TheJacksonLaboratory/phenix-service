@@ -1,8 +1,10 @@
+import os
 import sys
 import typing
 import logging
 import argparse
 import numpy as np
+import xlrd
 import pandas as pd
 from pathlib import Path
 
@@ -104,8 +106,11 @@ class HighContentScreen:
         sheet_names = pd.ExcelFile(self.randomization_file).sheet_names
         quads = []
         for k, name in enumerate(sheet_names):
-            quad_data = pd.read_excel(self.randomization_file, sheet_name=name,
-                    index_col=0).dropna().iloc[:,0].values
+            with open(os.devnull, "w") as devnull:
+                wb = xlrd.open_workbook(self.randomization_file, logfile=devnull)
+                quad_data = pd.read_excel(
+                        wb, sheet_name=name, index_col=0, engine="xlrd"
+                ).dropna().iloc[:,0].values
             quad = utils.convert_96_to_384(
                 quad_data, name="Source well 96", quad=k, colwise=True
             )
@@ -133,7 +138,7 @@ class HighContentScreen:
         logger.debug("Dilution and drug data mapped using randomization mapping.")
 
     @staticmethod
-    def _load_spectramax(spectramax_file, ignored):
+    def _load_spectramax(spectramax_file, custom_name, ignored):
         data = (
             pd.read_table(
                 spectramax_file,
@@ -147,14 +152,14 @@ class HighContentScreen:
             .values
         )
         flat_data = utils.flatten_plate_map(data, colwise=False)
-        logger.debug("Spectramax data constructed successfully.")
-        return utils.construct_384(flat_data, "spectramax", colwise=False), None
+        logger.debug(f"[{custom_name}] data constructed successfully.")
+        return utils.construct_384(flat_data, custom_name, colwise=False), None
 
     @staticmethod
-    def _load_phenix(phenix_file, phenix_columns):
+    def _load_phenix(phenix_file, custom_name, phenix_columns):
         data = pd.read_table(phenix_file, index_col=2)
         cols = utils.parse_column_spec(phenix_columns)
-        logger.debug(f"Will use phenix data columns: [{cols}]")
+        logger.debug(f"Will use [{custom_name}] data columns: [{cols}]")
         try:
             data = data.loc[:, cols]
         except:
@@ -162,7 +167,7 @@ class HighContentScreen:
         logger.debug("Phenix data constructed successfully.")
         if len(data.shape) == 1:
             data = data.to_frame()
-        data.columns = "Phenix - " + data.columns
+        data.columns = f"{custom_name} - " + data.columns
         return data, data.columns.tolist()
 
     def load_measurements(self):
@@ -170,10 +175,16 @@ class HighContentScreen:
         self.measurements = []
         for m_name, (m_file, m_cols) in self.measurement_files.items():
             assert_path_exists(m_name, m_file)
-            if m_name not in self._allowed_measurements.keys():
+            is_valid = False
+            m_key = None
+            for key_name in self._allowed_measurements.keys():
+                if key_name in m_name.lower():
+                    is_valid = True
+                    m_key = key_name
+            if not is_valid:
                 logger.warn(f"Measurement {m_name} not configured. Skipping.")
             logger.debug(f"Trying to load {m_name} from file [{m_file}]")
-            m_data, new_names = self._allowed_measurements[m_name](m_file, m_cols)
+            m_data, new_names = self._allowed_measurements[m_key](m_file, m_name, m_cols)
             measurements.append(m_data)
             if new_names:
                 self.measurements += new_names
