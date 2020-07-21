@@ -9,13 +9,15 @@ import seaborn as sns
 import cmocean
 from pathlib import Path
 from datetime import datetime
+import textwrap
 
 import utils
 
 plt.rcParams["xtick.major.pad"] = 0
 
 
-
+def wrap(text, width=30):
+    return "\n".join(textwrap.wrap(text, width=width))
 
 
 def add_timestamp(fig):
@@ -111,11 +113,11 @@ def plot_tri_data(
 
     if lower_cbar_ax is not None:
         ax.figure.colorbar(hm_lower, cax=lower_cbar_ax)
-        lower_cbar_ax.set_ylabel(lower_name)
+        lower_cbar_ax.set_ylabel(wrap(lower_name))
         lower_cbar_ax.yaxis.set_label_position("left")
     if upper_cbar_ax is not None:
         ax.figure.colorbar(hm_upper, cax=upper_cbar_ax)
-        upper_cbar_ax.set_ylabel(upper_name)
+        upper_cbar_ax.set_ylabel(wrap(upper_name))
         upper_cbar_ax.yaxis.set_label_position("left")
 
 
@@ -151,7 +153,7 @@ def plot_plate_data(ax, data, cmap_or_palette, vmin=1e-6, cbar_ax=None, log=Fals
             tl.set_position((x, y+0.06))
 
     if cbar_ax is not None:
-        cbar_ax.set_ylabel(data_name)
+        cbar_ax.set_ylabel(wrap(data_name, width=30))
         cbar_ax.yaxis.set_label_position("left")
 
 
@@ -175,7 +177,7 @@ def plot_categorical_annotation(ax, data, palette):
     ax.set_yticks(legend_data.flatten())
     ax.set_yticklabels(labels)
     ax.yaxis.tick_right()
-    ax.set_ylabel(data_name)
+    ax.set_ylabel(wrap(data_name))
     ax.yaxis.set_label_position("left")
 
 
@@ -268,7 +270,7 @@ def plot_randomization(data):
     return fig
 
 
-def plot_measurements(data, ncols=4, measurement_cols=None):
+def plot_measurements(data, ncols=2, measurement_cols=None):
     data = data.loc[~data.index.duplicated(), :]
     if measurement_cols is None:
         nonmeasurement_cols = pd.Index((
@@ -287,7 +289,7 @@ def plot_measurements(data, ncols=4, measurement_cols=None):
     for plate, col in zip(plates, measurement_cols):
         ax, anno1, anno2 = plate
         dmin, dmax = data[col].min(), data[col].max()
-        log = np.log10(dmax/dmin) > 3
+        log = dmax-dmin > 1000
         plot_plate_data(ax, data[col], "cmo.oxy", cbar_ax=anno1, log=log)
         if anno2 is not None:
             anno2.set_axis_off()
