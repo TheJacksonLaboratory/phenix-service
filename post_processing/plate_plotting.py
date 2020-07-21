@@ -279,8 +279,8 @@ def plot_measurements(data, ncols=4, measurement_cols=None):
     n_measurements = len(measurement_cols)
 
     fig, plates = plate_grid(
-        n_measurements//ncols+1,
-        n_measurements%ncols,
+        (n_measurements-1)//ncols+1,
+        min(n_measurements,ncols),
         [1]*n_measurements
     )
 
