@@ -1,6 +1,7 @@
 import re
 import numpy as np
 import pandas as pd
+import matplotlib
 import matplotlib.tri as tri
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm, Normalize, ListedColormap
@@ -12,6 +13,7 @@ from datetime import datetime
 import textwrap
 
 import utils
+
 
 plt.rcParams["xtick.major.pad"] = 0
 
@@ -137,7 +139,7 @@ def plot_plate_data(ax, data, cmap_or_palette, vmin=1e-6, cbar_ax=None, log=Fals
         cmap=cmap_or_palette,
         cbar=cbar_ax is not None,
         cbar_ax=cbar_ax,
-        norm=LogNorm() if log else None,#Normalize(),
+        norm=LogNorm() if log else None,
         linewidths=0.5, linecolor="k"
     )
     ax.set_xlabel("")
@@ -155,6 +157,8 @@ def plot_plate_data(ax, data, cmap_or_palette, vmin=1e-6, cbar_ax=None, log=Fals
     if cbar_ax is not None:
         cbar_ax.set_ylabel(wrap(data_name, width=30))
         cbar_ax.yaxis.set_label_position("left")
+    print(ax.get_xlim())
+    print(ax.get_ylim())
 
 
 def plot_categorical_annotation(ax, data, palette):

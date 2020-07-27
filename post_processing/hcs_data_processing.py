@@ -153,7 +153,8 @@ class HighContentScreen:
         )
         flat_data = utils.flatten_plate_map(data, colwise=False)
         logger.debug(f"[{custom_name}] data constructed successfully.")
-        return utils.construct_384(flat_data, custom_name, colwise=False), None
+        data = utils.construct_384(flat_data, custom_name, colwise=False)
+        return data, None
 
     @staticmethod
     def _load_phenix(phenix_file, custom_name, phenix_columns):
@@ -190,6 +191,7 @@ class HighContentScreen:
                 self.measurements += new_names
             else:
                 self.measurements.append(m_name)
+
         logger.debug("All measurements loaded successfully.")
         self.data.append(pd.concat(measurements, axis=1))
 
@@ -239,6 +241,7 @@ class HighContentScreen:
         self.output = finalized
         return finalized
 
+
     def save_output(self, output_file):
         if not self.overwrite_allowed:
             assert_path_does_not_exist("Output file", output_file)
@@ -279,6 +282,7 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Path to HCS input form",
     )
+
     parser.add_argument(
         "-r",
         dest="randomization_file",
@@ -286,6 +290,7 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Path to randomization CSV file",
     )
+
     parser.add_argument(
         "-m", "--measurement",
         dest="measurements",
@@ -297,6 +302,7 @@ def parse_args() -> argparse.Namespace:
             " all columns presented."
         )
     )
+
     parser.add_argument(
         "-o",
         dest="output_file",
@@ -304,6 +310,7 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Path to save output dataframe",
     )
+
     parser.add_argument(
         "-p",
         dest="plot_pdf_file",
@@ -311,10 +318,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Path to save plots [None = default]",
     )
+
     parser.add_argument(
         "-f", "--force", action="store_true",
         help="Overwite output files"
     )
+
     parser.add_argument(
         "-v", "--verbose", action="store_true",
         help="Print extra information"
@@ -368,9 +377,10 @@ if __name__ == "__main__":
     hcs = HighContentScreen(args.hcs_input_file, overwrite=args.force)
     hcs.register_data(
         measurements=args.measurements,
-        randomization=args.randomization_file
+        randomization=args.randomization_file,
     )
     aggregated = hcs.pipeline()
     hcs.save_output(args.output_file)
+
     if args.plot_pdf_file:
         hcs.plot_plate_maps(args.plot_pdf_file)
