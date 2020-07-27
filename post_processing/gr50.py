@@ -195,7 +195,7 @@ if __name__ == "__main__":
         intermediate,
         alpha=0.05,
         gr_value="gr_value",
-        ic_value="t1",
+        ic_value="relative_count",
         keys=["Drug"]
     )
 
