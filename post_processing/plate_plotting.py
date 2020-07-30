@@ -36,41 +36,34 @@ def plate_grid(nrows, ncols, n_annos=None):
     hratios = ([8, 8, 2] * nrows)[:gs_rows]
     wratios = ([24, 1, 4] * ncols)[:gs_cols]
     gs = plt.GridSpec(
-        gs_rows, gs_cols,
-        height_ratios=hratios, width_ratios=wratios,
-        wspace=0.10
+        gs_rows, gs_cols, height_ratios=hratios, width_ratios=wratios, wspace=0.10
     )
 
     plates = []
     for i in range(nrows):
         for j in range(ncols):
-            n_anno = 2 if n_annos is None else n_annos[i*ncols + j]
-            plot_ax = fig.add_subplot(gs[3*i:3*i+2, 3*j], aspect="equal")
+            n_anno = 2 if n_annos is None else n_annos[i * ncols + j]
+            plot_ax = fig.add_subplot(gs[3 * i : 3 * i + 2, 3 * j], aspect="equal")
             if n_anno != 2:
-                ann1_ax = fig.add_subplot(gs[3*i:3*i+2, 3*j+1])
+                ann1_ax = fig.add_subplot(gs[3 * i : 3 * i + 2, 3 * j + 1])
                 ann2_ax = None
             else:
-                ann1_ax = fig.add_subplot(gs[3*i, 3*j+1])
-                ann2_ax = fig.add_subplot(gs[3*i+1, 3*j+1])
+                ann1_ax = fig.add_subplot(gs[3 * i, 3 * j + 1])
+                ann2_ax = fig.add_subplot(gs[3 * i + 1, 3 * j + 1])
             plates.append([plot_ax, ann1_ax, ann2_ax])
 
     return fig, plates
 
 
-
 def trigrid(rows, cols):
-    x,y = np.meshgrid(range(cols+1), range(rows+1))
-    i,j = x[:rows,:cols].ravel(), y[:rows,:cols].ravel()
-    lower = np.vstack((
-        i + (cols + 1) * j,
-        i + (cols + 1) * j + 1,
-        i + (cols + 1) * (j+1)
-    )).T
-    upper = np.vstack((
-        i + (cols + 1) * j + 1,
-        i + (cols + 1) * (j+1) + 1,
-        i + (cols + 1) * (j+1)
-    )).T
+    x, y = np.meshgrid(range(cols + 1), range(rows + 1))
+    i, j = x[:rows, :cols].ravel(), y[:rows, :cols].ravel()
+    lower = np.vstack(
+        (i + (cols + 1) * j, i + (cols + 1) * j + 1, i + (cols + 1) * (j + 1))
+    ).T
+    upper = np.vstack(
+        (i + (cols + 1) * j + 1, i + (cols + 1) * (j + 1) + 1, i + (cols + 1) * (j + 1))
+    ).T
     lower = tri.Triangulation(x.ravel(), y.ravel(), lower)
     upper = tri.Triangulation(x.ravel(), y.ravel(), upper)
     return x.ravel(), y.ravel(), lower, upper
@@ -78,10 +71,14 @@ def trigrid(rows, cols):
 
 def plot_tri_data(
     ax,
-    lower_data, upper_data,
-    lower_cmap, upper_cmap,
-    lower_cbar_ax=None, upper_cbar_ax=None,
-    log_lower=False, log_upper=False,
+    lower_data,
+    upper_data,
+    lower_cmap,
+    upper_cmap,
+    lower_cbar_ax=None,
+    upper_cbar_ax=None,
+    log_lower=False,
+    log_upper=False,
 ):
     lower_name = lower_data.name
     upper_name = upper_data.name
@@ -96,14 +93,16 @@ def plot_tri_data(
     upper_norm = LogNorm() if log_upper else Normalize()
 
     n, m = lower_data.shape
-    x, y, lower_tri, upper_tri = trigrid(n,m)
-    hm_lower = ax.tripcolor(lower_tri, lower_data.values.ravel(),
-            cmap=lower_cmap, norm=lower_norm)
-    hm_upper = ax.tripcolor(upper_tri, upper_data.values.ravel(),
-            cmap=upper_cmap, norm=upper_norm)
+    x, y, lower_tri, upper_tri = trigrid(n, m)
+    hm_lower = ax.tripcolor(
+        lower_tri, lower_data.values.ravel(), cmap=lower_cmap, norm=lower_norm
+    )
+    hm_upper = ax.tripcolor(
+        upper_tri, upper_data.values.ravel(), cmap=upper_cmap, norm=upper_norm
+    )
 
-    ax.set_xticks(np.arange(m)+0.5)
-    ax.set_yticks(np.arange(n)+0.5)
+    ax.set_xticks(np.arange(m) + 0.5)
+    ax.set_yticks(np.arange(n) + 0.5)
     ax.set_xticklabels(upper_data.columns, rotation=0)
     ax.set_yticklabels(upper_data.index, rotation=0)
     ax.set_xlabel("")
@@ -140,7 +139,8 @@ def plot_plate_data(ax, data, cmap_or_palette, vmin=1e-6, cbar_ax=None, log=Fals
         cbar=cbar_ax is not None,
         cbar_ax=cbar_ax,
         norm=LogNorm() if log else None,
-        linewidths=0.5, linecolor="k"
+        linewidths=0.5,
+        linecolor="k",
     )
     ax.set_xlabel("")
     ax.set_ylabel("")
@@ -152,7 +152,7 @@ def plot_plate_data(ax, data, cmap_or_palette, vmin=1e-6, cbar_ax=None, log=Fals
     if is_384:
         for tl in ax.get_xticklabels()[1::2]:
             x, y = tl.get_position()
-            tl.set_position((x, y+0.06))
+            tl.set_position((x, y + 0.06))
 
     if cbar_ax is not None:
         cbar_ax.set_ylabel(wrap(data_name, width=30))
@@ -199,14 +199,10 @@ def plate_qc_condensed(data):
         "tab10",
         "cmo.matter",
         log_upper=True,
-        upper_cbar_ax=anno2
+        upper_cbar_ax=anno2,
     )
 
-    plot_categorical_annotation(
-        anno1,
-        data["Drug"],
-        "tab10"
-    )
+    plot_categorical_annotation(anno1, data["Drug"], "tab10")
 
     ax.set_xlabel("Source plate")
     add_timestamp(fig)
@@ -224,24 +220,14 @@ def plate_qc(data):
     ax_bot, anno_bot1, anno_bot2 = plates[1]
 
     plot_plate_data(
-        ax_top,
-        data["Drug"],
-        "tab10",
+        ax_top, data["Drug"], "tab10",
     )
 
     plot_plate_data(
-        ax_bot,
-        data["Concentration"],
-        "cmo.matter",
-        cbar_ax=anno_bot1,
-        log=True,
+        ax_bot, data["Concentration"], "cmo.matter", cbar_ax=anno_bot1, log=True,
     )
 
-    plot_categorical_annotation(
-        anno_top1,
-        data["Drug"],
-        "tab10"
-    )
+    plot_categorical_annotation(anno_top1, data["Drug"], "tab10")
 
     ax_bot.set_xlabel("Source plate")
     add_timestamp(fig)
@@ -277,23 +263,25 @@ def plot_randomization(data):
 def plot_measurements(data, ncols=2, measurement_cols=None):
     data = data.loc[~data.index.duplicated(), :]
     if measurement_cols is None:
-        nonmeasurement_cols = pd.Index((
-            "Well 384, Source well 96, Quadrant, "
-            "Source row 96, Source col 96, Row 384, Col 384, Concentration, Drug"
-        ).split(", "))
+        nonmeasurement_cols = pd.Index(
+            (
+                "Well 384, Source well 96, Quadrant, "
+                "Source row 96, Source col 96, Row 384, Col 384, Concentration, Drug"
+            ).split(", ")
+        )
         measurement_cols = data.columns[:-2].difference(nonmeasurement_cols)
     n_measurements = len(measurement_cols)
 
     fig, plates = plate_grid(
-        (n_measurements-1)//ncols+1,
-        min(n_measurements,ncols),
-        [1]*n_measurements
+        (n_measurements - 1) // ncols + 1,
+        min(n_measurements, ncols),
+        [1] * n_measurements,
     )
 
     for plate, col in zip(plates, measurement_cols):
         ax, anno1, anno2 = plate
         dmin, dmax = data[col].min(), data[col].max()
-        log = dmax-dmin > 1000
+        log = dmax - dmin > 1000
         plot_plate_data(ax, data[col], "cmo.oxy", cbar_ax=anno1, log=log)
         if anno2 is not None:
             anno2.set_axis_off()
@@ -310,9 +298,7 @@ if __name__ == "__main__":
     data = pd.read_csv(data_path, index_col=0)
     outfile = f"{prefix}_qc-plots.pdf"
     pdf = PdfPages(outfile)
-    figs = [
-        plate_qc(data), plot_randomization(data), plot_measurements(data)
-    ]
+    figs = [plate_qc(data), plot_randomization(data), plot_measurements(data)]
     for fig in figs:
         pdf.savefig(fig)
     pdf.close()

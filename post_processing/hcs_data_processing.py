@@ -13,11 +13,10 @@ from plate_plotting import plate_qc, plot_randomization, plot_measurements, PdfP
 
 
 class HighContentScreen:
-
     def __init__(self, input_form_path, overwrite=False):
         self._allowed_measurements = {
             "spectramax": self._load_spectramax,
-            "phenix": self._load_phenix
+            "phenix": self._load_phenix,
         }
         self.has_randomization = False
         self.input_form_path = input_form_path
@@ -26,7 +25,6 @@ class HighContentScreen:
         self.data = []
         logger.debug("HCS object initialized successfully.")
 
-
     @staticmethod
     def validate_hcs_excel_file(excel_file):
         log_assert(
@@ -34,15 +32,15 @@ class HighContentScreen:
         )
 
     def _parse_screen_metadata(self, excel_file):
-        raw = excel_file.parse("Description", index_col=0, header=None).fillna(
-            ""
-        )
+        raw = excel_file.parse("Description", index_col=0, header=None).fillna("")
         description = raw.iloc[:18, :1].squeeze()
         new_index = description.index.dropna()
         description = description.loc[new_index].to_dict()
 
         dispensing = raw.iloc[19:22]
-        dispensing = dispensing.rename(columns=dispensing.iloc[0]).drop(dispensing.index[0])
+        dispensing = dispensing.rename(columns=dispensing.iloc[0]).drop(
+            dispensing.index[0]
+        )
         dilution_points = raw.iloc[22, 0]
         dilution_constant = raw.iloc[23, 0]
         notes = raw.iloc[24, 0]
@@ -80,16 +78,17 @@ class HighContentScreen:
         logger.debug("HCS excel file read successfully.")
 
     def construct_dilution_series(self):
-        dilution_series = (1 / self.serial_dilution_constant) ** np.arange(self.serial_dilution_series_length)
-
-        dilutions = self.dispensing.iloc[1, :].values[:, None] * (
-            dilution_series
+        dilution_series = (1 / self.serial_dilution_constant) ** np.arange(
+            self.serial_dilution_series_length
         )
+
+        dilutions = self.dispensing.iloc[1, :].values[:, None] * (dilution_series)
         dilution_plate = np.zeros((8, 12))
-        dilution_plate[:, :self.serial_dilution_series_length] = dilutions
+        dilution_plate[:, : self.serial_dilution_series_length] = dilutions
         dilution_data = utils.construct_96(
             utils.flatten_plate_map(dilution_plate, colwise=False),
-            "Concentration", colwise=False
+            "Concentration",
+            colwise=False,
         )
         self.dilution_series = dilution_data
         logger.debug("Created dilution series data sucessfully.")
@@ -97,8 +96,10 @@ class HighContentScreen:
     def construct_drug_series(self):
         self.drug_series = utils.construct_96(
             utils.flatten_plate_map(
-                np.repeat(self.dispensing.iloc[0,:].values, 12), colwise=False
-            ), "Drug", colwise=False
+                np.repeat(self.dispensing.iloc[0, :].values, 12), colwise=False
+            ),
+            "Drug",
+            colwise=False,
         )
         logger.debug("Created drug name data sucessfully.")
 
@@ -108,28 +109,41 @@ class HighContentScreen:
         for k, name in enumerate(sheet_names):
             with open(os.devnull, "w") as devnull:
                 wb = xlrd.open_workbook(self.randomization_file, logfile=devnull)
-                quad_data = pd.read_excel(
-                        wb, sheet_name=name, index_col=0, engine="xlrd"
-                ).dropna().iloc[:,0].values
+                quad_data = (
+                    pd.read_excel(wb, sheet_name=name, index_col=0, engine="xlrd")
+                    .dropna()
+                    .iloc[:, 0]
+                    .values
+                )
             quad = utils.convert_96_to_384(
                 quad_data, name="Source well 96", quad=k, colwise=True
             )
             quads.append(quad)
 
         randomization_data = pd.concat(quads, axis=0)
-        randomization_data["Source row 96"], randomization_data["Source col 96"] = utils.split_row_col(randomization_data["Source well 96"]).values.T
-        randomization_data["Row 384"], randomization_data["Col 384"] = utils.split_row_col(randomization_data.index).values.T
+        (
+            randomization_data["Source row 96"],
+            randomization_data["Source col 96"],
+        ) = utils.split_row_col(randomization_data["Source well 96"]).values.T
+        (
+            randomization_data["Row 384"],
+            randomization_data["Col 384"],
+        ) = utils.split_row_col(randomization_data.index).values.T
         self.data.append(randomization_data)
         self.has_randomization = True
-        self.randomization_mapping = randomization_data.iloc[:,0].to_dict()
+        self.randomization_mapping = randomization_data.iloc[:, 0].to_dict()
         logger.debug("Randomization mapping created successfully.")
 
     def map_randomization(self):
         if not self.has_randomization:
-            logger_exception("Must load randomization before trying to map randomization.")
+            logger_exception(
+                "Must load randomization before trying to map randomization."
+            )
             exit(2)
 
-        dilution_series_384 = self.dilution_series.reindex(self.randomization_mapping.values())
+        dilution_series_384 = self.dilution_series.reindex(
+            self.randomization_mapping.values()
+        )
         dilution_series_384.index = self.randomization_mapping.keys()
         drug_series_384 = self.drug_series.reindex(self.randomization_mapping.values())
         drug_series_384.index = self.randomization_mapping.keys()
@@ -185,7 +199,9 @@ class HighContentScreen:
             if not is_valid:
                 logger.warn(f"Measurement {m_name} not configured. Skipping.")
             logger.debug(f"Trying to load {m_name} from file [{m_file}]")
-            m_data, new_names = self._allowed_measurements[m_key](m_file, m_name, m_cols)
+            m_data, new_names = self._allowed_measurements[m_key](
+                m_file, m_name, m_cols
+            )
             measurements.append(m_data)
             if new_names:
                 self.measurements += new_names
@@ -241,13 +257,11 @@ class HighContentScreen:
         self.output = finalized
         return finalized
 
-
     def save_output(self, output_file):
         if not self.overwrite_allowed:
             assert_path_does_not_exist("Output file", output_file)
         self.output.to_csv(output_file)
         logger.debug(f"Output saved to [{output_file}].")
-
 
     def plot_plate_maps(self, plot_file):
         logger.debug(f"Attempting to plot plate data...")
@@ -256,7 +270,7 @@ class HighContentScreen:
         figs = [
             plate_qc(self.output),
             plot_randomization(self.output),
-            plot_measurements(self.output, measurement_cols=self.measurements)
+            plot_measurements(self.output, measurement_cols=self.measurements),
         ]
         logger.debug(f"Plots generated")
         pdf = PdfPages(plot_file)
@@ -292,15 +306,17 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "-m", "--measurement",
+        "-m",
+        "--measurement",
         dest="measurements",
-        nargs="+", action="append",
+        nargs="+",
+        action="append",
         required=False,
         help=(
             "Measurement specification: measurement_name measurement_file "
             "[columns_to_use]. If [columns_to_use] is not given, will use "
             " all columns presented."
-        )
+        ),
     )
 
     parser.add_argument(
@@ -320,19 +336,17 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "-f", "--force", action="store_true",
-        help="Overwite output files"
+        "-f", "--force", action="store_true", help="Overwite output files"
     )
 
     parser.add_argument(
-        "-v", "--verbose", action="store_true",
-        help="Print extra information"
+        "-v", "--verbose", action="store_true", help="Print extra information"
     )
 
     args = parser.parse_args()
     if args.measurements:
         args.measurements = dict(
-            (item[0], [Path(item[1]), None if len(item)==2 else item[2]])
+            (item[0], [Path(item[1]), None if len(item) == 2 else item[2]])
             for item in args.measurements
         )
 
@@ -376,8 +390,7 @@ if __name__ == "__main__":
 
     hcs = HighContentScreen(args.hcs_input_file, overwrite=args.force)
     hcs.register_data(
-        measurements=args.measurements,
-        randomization=args.randomization_file,
+        measurements=args.measurements, randomization=args.randomization_file,
     )
     aggregated = hcs.pipeline()
     hcs.save_output(args.output_file)
