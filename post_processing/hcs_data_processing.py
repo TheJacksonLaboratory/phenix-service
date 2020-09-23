@@ -136,7 +136,7 @@ class HighContentScreen:
 
     def map_randomization(self):
         if not self.has_randomization:
-            logger_exception(
+            logger.exception(
                 "Must load randomization before trying to map randomization."
             )
             exit(2)
@@ -257,6 +257,37 @@ class HighContentScreen:
         self.output = finalized
         return finalized
 
+    def short_pipeline(self):
+        self.construct_dilution_series()
+        self.construct_drug_series()
+        self.measurements = []
+
+        quads = [
+            utils.convert_96_to_384(
+                utils.INDEX_96_F.values, name="Source well 96", quad=k, colwise=True
+            )
+            for k in range(4)
+        ]
+        randomization_data = pd.concat(quads, axis=0)
+        (
+            randomization_data["Source row 96"],
+            randomization_data["Source col 96"],
+        ) = utils.split_row_col(randomization_data["Source well 96"]).values.T
+        (
+            randomization_data["Row 384"],
+            randomization_data["Col 384"],
+        ) = utils.split_row_col(randomization_data.index).values.T
+        self.data.append(randomization_data)
+        self.has_randomization = True
+        self.randomization_mapping = randomization_data.iloc[:, 0].to_dict()
+
+        self.map_randomization()
+        aggregated = self.aggregate_data()
+        finalized = self.incorporate_plate_variables(aggregated)
+        self.output = finalized
+        return finalized
+
+
     def save_output(self, output_file):
         if not self.overwrite_allowed:
             assert_path_does_not_exist("Output file", output_file)
@@ -267,11 +298,11 @@ class HighContentScreen:
         logger.debug(f"Attempting to plot plate data...")
         if not self.overwrite_allowed:
             assert_path_does_not_exist("Plot file", plot_file)
-        figs = [
-            plate_qc(self.output),
-            plot_randomization(self.output),
-            plot_measurements(self.output, measurement_cols=self.measurements),
-        ]
+        figs = [ plate_qc(self.output) ]
+        if self.has_randomization:
+            figs += [ plot_randomization(self.output) ]
+        if self.measurements:
+            figs += [ plot_measurements(self.output, measurement_cols=self.measurements) ]
         logger.debug(f"Plots generated")
         pdf = PdfPages(plot_file)
         for fig in figs:
@@ -301,7 +332,7 @@ def parse_args() -> argparse.Namespace:
         "-r",
         dest="randomization_file",
         type=Path,
-        required=True,
+        required=False,
         help="Path to randomization CSV file",
     )
 
@@ -341,6 +372,10 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Print extra information"
+    )
+
+    parser.add_argument(
+        "-s", "--short", action="store_true", help="Only run short pipeline"
     )
 
     args = parser.parse_args()
@@ -392,7 +427,10 @@ if __name__ == "__main__":
     hcs.register_data(
         measurements=args.measurements, randomization=args.randomization_file,
     )
-    aggregated = hcs.pipeline()
+    if args.short:
+        aggregated = hcs.short_pipeline()
+    else:
+        aggregated = hcs.pipeline()
     hcs.save_output(args.output_file)
 
     if args.plot_pdf_file:
