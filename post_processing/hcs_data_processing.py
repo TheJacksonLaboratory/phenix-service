@@ -107,16 +107,17 @@ class HighContentScreen:
         sheet_names = pd.ExcelFile(self.randomization_file).sheet_names
         quads = []
         for k, name in enumerate(sheet_names):
+            if k == 0: continue
             with open(os.devnull, "w") as devnull:
                 wb = xlrd.open_workbook(self.randomization_file, logfile=devnull)
                 quad_data = (
-                    pd.read_excel(wb, sheet_name=name, index_col=0, engine="xlrd")
+                    pd.read_excel(wb, sheet_name=name, engine="xlrd")
                     .dropna()
                     .iloc[:, 0]
                     .values
                 )
             quad = utils.convert_96_to_384(
-                quad_data, name="Source well 96", quad=k, colwise=True
+                quad_data, name="Source well 96", quad=k-1, colwise=True
             )
             quads.append(quad)
 
