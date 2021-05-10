@@ -22,6 +22,10 @@ def construct_argparser():
         "output_location", type=Path,
         help="Output directory to store images and/or metadata"
     )
+    parent.add_argument(
+        "--harmony-id", default=None,
+        help="Optional harmony id string to select only one set of measurements"
+    )
 
     convert = subparsers.add_parser(
         "convert",
@@ -62,10 +66,11 @@ class HarmonyArchive(object):
         #    f"Image DB {self.image_db_location} not found!"
         self.measurement_xml_locations = self.location.glob("XML/*/*.xml")
 
-    def load_image_database(self):
+    def load_image_database(self, measurment=None):
         image_data = {}
         for database_location in self.image_db_locations:
             measurement_key = database_location.parent.name
+            if (measurement is not None) and (measurement_key != measurement): continue
 
             with sqlite3.connect(str(database_location)) as image_db:
                 image_db.row_factory = sqlite3.Row
@@ -83,7 +88,7 @@ class HarmonyArchive(object):
 
         for key, records in self.image_data.items():
             for record in records:
-                human_readable_image_name = human_readable_format.format(**record)
+                human_readable_image_name = self.human_readable_format.format(**record)
                 record["human_readable"] = human_readable_image_name
 
                 src_path = self.location / "IMAGES" / key / record["Url"]
@@ -112,7 +117,7 @@ def main():
     args = argparser.parse_args()
 
     archive = HarmonyArchive(args.archive_root)
-    archive.load_image_database()
+    archive.load_image_database(args.harmony_id)
 
     args.func(archive, args.output_location)
 
