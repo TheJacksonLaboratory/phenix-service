@@ -66,7 +66,7 @@ class HarmonyArchive(object):
         #    f"Image DB {self.image_db_location} not found!"
         self.measurement_xml_locations = self.location.glob("XML/*/*.xml")
 
-    def load_image_database(self, measurment=None):
+    def load_image_database(self, measurement=None):
         image_data = {}
         for database_location in self.image_db_locations:
             measurement_key = database_location.parent.name
