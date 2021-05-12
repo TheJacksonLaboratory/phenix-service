@@ -6,7 +6,7 @@ import sqlite3
 import argparse
 from pathlib import Path
 
-import xml.etree.ElementTree as ET
+import xmltodict
 
 
 def construct_argparser():
@@ -19,7 +19,7 @@ def construct_argparser():
         help="Path to 'Harmony-Archive' directory"
     )
     parent.add_argument(
-        "output_location", type=Path,
+        "-o", "--output-location", type=Path,
         help="Output directory to store images and/or metadata"
     )
     parent.add_argument(
@@ -36,12 +36,22 @@ def construct_argparser():
         )
     )
     convert.set_defaults(func=HarmonyArchive.convert_to_human_readable)
+
     metadata = subparsers.add_parser(
         "metadata",
         parents=[parent],
         help="Only generate metadata from a Harmony-Archive"
     )
     metadata.set_defaults(func=HarmonyArchive.generate_metadata_json)
+
+    lister = subparsers.add_parser(
+        "list",
+        parents=[parent],
+        help="List what exists in a Harmony Archive"
+    )
+    lister.set_defaults(output_location=None)
+    lister.set_defaults(func=HarmonyArchive.list_experiments)
+
     return parser
 
 
@@ -50,6 +60,8 @@ class HarmonyArchive(object):
         "r{Row:02g}c{Col:02g}f{Field:02g}p{Plane:02g}-"
         "ch{Channel}sk{SlowKin}fk{FastKin}fl{Flim}.tiff"
     )
+
+    xml_ns = {"http://www.perkinelmer.com/PEHH/HarmonyV5": None}
 
     def __init__(self, location):
         self.location = location
@@ -64,7 +76,20 @@ class HarmonyArchive(object):
         self.image_db_locations = self.location.glob("IMAGES/*/IMAGES.sqlite")
         #assert self.image_db_location.exists(), \
         #    f"Image DB {self.image_db_location} not found!"
-        self.measurement_xml_locations = self.location.glob("XML/*/*.xml")
+        self.measurement_xml_locations = self.location.glob("XML/MEASUREMENT/*.xml")
+
+    def parse_xmls(self):
+        xmls = {}
+        for xml_loc in self.measurement_xml_locations:
+            with open(xml_loc, "rb") as fin:
+               x = xmltodict.parse(fin, process_namespaces=False, encoding="utf-8")#namespaces=self.xml_ns)
+            root = x.get("Measurement", None)
+            if root is None: continue
+            mid = root.get("MeasurementID", None)
+            if mid is not None:
+                xmls[mid] = root
+        self.metadata = xmls
+        self.id_mapping = dict((k, v["PlateName"]) for k, v in xmls.items())
 
     def load_image_database(self, measurement=None):
         image_data = {}
@@ -82,7 +107,11 @@ class HarmonyArchive(object):
 
         self.image_data = image_data
 
+        self.parse_xmls()
+
     def convert_to_human_readable(self, output_location):
+        if output_location is None:
+            raise ValueError("Must specify output-location")
         if "image_data" not in self.__dict__:
             self.load_image_database()
 
@@ -92,12 +121,12 @@ class HarmonyArchive(object):
                 record["human_readable"] = human_readable_image_name
 
                 src_path = self.location / "IMAGES" / key / record["Url"]
-                dest_path = output_location / key / human_readable_image_name
+                dest_name = self.id_mapping.get(key, key)
+                dest_path = output_location / dest_name / human_readable_image_name
 
                 if not dest_path.parent.exists():
                     os.makedirs(dest_path.parent)
                 shutil.copyfile(src_path, dest_path)
-                break
 
 
     def generate_metadata_json(self, output_location):
@@ -110,6 +139,13 @@ class HarmonyArchive(object):
 
                 print(child.tag)
                 break
+
+    def list_experiments(self, *args, **kwargs):
+        print(f"Measurements located in Archive: {self.location}")
+        fmt = "{:<40}{:<30}{:>10}"
+        print(fmt.format("Measurement ID", "Plate Name", "# images"))
+        for key, records in self.image_data.items():
+            print(fmt.format(key, self.id_mapping[key], len(records)))
 
 
 def main():
