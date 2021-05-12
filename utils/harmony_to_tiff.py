@@ -142,10 +142,10 @@ class HarmonyArchive(object):
 
     def list_experiments(self, *args, **kwargs):
         print(f"Measurements located in Archive: {self.location}")
-        fmt = "{:<40}{:<30}{:>10}"
+        fmt = "{:<38}{:<50}{:>10}"
         print(fmt.format("Measurement ID", "Plate Name", "# images"))
         for key, records in self.image_data.items():
-            print(fmt.format(key, self.id_mapping[key], len(records)))
+            print(fmt.format(key, self.id_mapping[key][:50], len(records)))
 
 
 def main():
